@@ -25,7 +25,7 @@ func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
 			Body:        msg,
 		})
 	if err != nil {
-		return fmt.Errorf("error publishing message :%v", err)
+		return fmt.Errorf("error publishing message: %v", err)
 	}
 
 	return nil
