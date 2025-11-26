@@ -3,9 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
+	"github.com/seiobata/peril/internal/gamelogic"
 	"github.com/seiobata/peril/internal/pubsub"
 	"github.com/seiobata/peril/internal/routing"
 
@@ -28,21 +27,42 @@ func main() {
 		log.Fatalf("channel could not be opened: %v", err)
 	}
 
-	err = pubsub.PublishJSON(
-		pubChan,
-		routing.ExchangePerilDirect,
-		routing.PauseKey,
-		routing.PlayingState{
-			IsPaused: true,
-		},
-	)
-	if err != nil {
-		log.Printf("problem publishing message: %v", err)
+	gamelogic.PrintServerHelp()
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+		switch words[0] {
+		case "pause":
+			err = pubsub.PublishJSON(
+				pubChan,
+				routing.ExchangePerilDirect,
+				routing.PauseKey,
+				routing.PlayingState{
+					IsPaused: true,
+				},
+			)
+			if err != nil {
+				log.Printf("problem publishing message: %v", err)
+			}
+		case "resume":
+			err = pubsub.PublishJSON(
+				pubChan,
+				routing.ExchangePerilDirect,
+				routing.PauseKey,
+				routing.PlayingState{
+					IsPaused: false,
+				},
+			)
+			if err != nil {
+				log.Printf("problem publishing message: %v", err)
+			}
+		case "quit":
+			fmt.Println("Peril server shutting down...")
+			return
+		default:
+			fmt.Println("command not found")
+		}
 	}
-
-	// waiting for signal
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt)
-	<-sigChan
-	fmt.Println("Shutting down Peril server...")
 }

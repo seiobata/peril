@@ -6,10 +6,11 @@ import (
 	"os"
 	"os/signal"
 
-	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/seiobata/peril/internal/gamelogic"
 	"github.com/seiobata/peril/internal/pubsub"
 	"github.com/seiobata/peril/internal/routing"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 const connection_string = "amqp://guest:guest@localhost:5672/"
