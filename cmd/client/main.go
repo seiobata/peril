@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
 	"github.com/seiobata/peril/internal/gamelogic"
 	"github.com/seiobata/peril/internal/pubsub"
@@ -40,8 +38,44 @@ func main() {
 	}
 	fmt.Printf("%v queue declared and bound!\n", queue.Name)
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt)
-	<-sigChan
-	fmt.Println("Disconnecting from Peril server...")
+	client := gamelogic.NewGameState(username)
+
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+		switch words[0] {
+		case "spawn":
+			err = client.CommandSpawn(words)
+			if err != nil {
+				fmt.Printf("problem executing \"spawn\" command: %v\n", err)
+				continue
+			}
+
+		case "move":
+			_, err := client.CommandMove(words)
+			if err != nil {
+				fmt.Printf("problem executing \"move\" command: %v\n", err)
+				continue
+			}
+			fmt.Println("Move command successful!")
+
+		case "status":
+			client.CommandStatus()
+
+		case "help":
+			gamelogic.PrintClientHelp()
+
+		case "spam":
+			fmt.Println("Spamming is not allowed yet!")
+
+		case "quit":
+			gamelogic.PrintQuit()
+			return
+
+		default:
+			fmt.Printf("Unknown command. Enter \"help\" for list of commands.\n")
+		}
+	}
 }
