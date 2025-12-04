@@ -26,20 +26,22 @@ func main() {
 		log.Fatalf("problem retrieving username: %v", err)
 	}
 
-	_, queue, err := pubsub.DeclareAndBind(
+	gs := gamelogic.NewGameState(username)
+
+	// create new subscribe channel for pause queue
+	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilDirect,
 		routing.PauseKey+"."+username,
 		routing.PauseKey,
 		pubsub.Transient,
+		handlerPause(gs),
 	)
 	if err != nil {
-		log.Fatalf("could not declare and bind to pause queue: %v", err)
+		log.Fatalf("could not create pause subscribe channel: %v", err)
 	}
-	fmt.Printf("%v queue declared and bound!\n", queue.Name)
 
-	client := gamelogic.NewGameState(username)
-
+	// listen for player commands
 	for {
 		words := gamelogic.GetInput()
 		if len(words) == 0 {
@@ -47,14 +49,14 @@ func main() {
 		}
 		switch words[0] {
 		case "spawn":
-			err = client.CommandSpawn(words)
+			err = gs.CommandSpawn(words)
 			if err != nil {
 				fmt.Printf("problem executing \"spawn\" command: %v\n", err)
 				continue
 			}
 
 		case "move":
-			_, err := client.CommandMove(words)
+			_, err := gs.CommandMove(words)
 			if err != nil {
 				fmt.Printf("problem executing \"move\" command: %v\n", err)
 				continue
@@ -62,7 +64,7 @@ func main() {
 			fmt.Println("Move command successful!")
 
 		case "status":
-			client.CommandStatus()
+			gs.CommandStatus()
 
 		case "help":
 			gamelogic.PrintClientHelp()
