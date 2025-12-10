@@ -41,7 +41,9 @@ func DeclareAndBind(
 		queueType != Durable,
 		queueType != Durable,
 		false,
-		nil,
+		amqp.Table{
+			"x-dead-letter-exchange": "peril_dlx", // send discarded messages to peril_dlx
+		},
 	)
 	if err != nil {
 		return nil, amqp.Queue{}, fmt.Errorf("problem creating queue: %v", err)
