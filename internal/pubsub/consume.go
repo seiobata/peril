@@ -15,6 +15,14 @@ const (
 	Transient
 )
 
+type AckType int
+
+const (
+	Ack AckType = iota
+	NackRequeue
+	NackDiscard
+)
+
 func DeclareAndBind(
 	conn *amqp.Connection,
 	exchange,
@@ -58,15 +66,9 @@ func SubscribeJSON[T any](
 	queueName,
 	key string,
 	queueType SimpleQueueType,
-	handler func(T),
+	handler func(T) AckType,
 ) error {
-	ch, queue, err := DeclareAndBind(
-		conn,
-		exchange,
-		queueName,
-		key,
-		queueType,
-	)
+	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
 		return fmt.Errorf("could not declare and bind queue: %v", err)
 	}
@@ -77,18 +79,26 @@ func SubscribeJSON[T any](
 	}
 
 	go func() {
+		defer ch.Close()
 		for msg := range deliveryCh {
 			var body T
 			if err := json.Unmarshal(msg.Body, &body); err != nil {
 				log.Printf("could not unmarshal message body: %v", err)
 				continue
 			}
-			handler(body)
-			if err := msg.Ack(false); err != nil {
-				log.Printf("could not acknowledge message: %v", err)
+			acknowledged := handler(body)
+			switch acknowledged {
+			case Ack:
+				msg.Ack(false)
+				fmt.Println("Message successfully acknowledged!")
+			case NackRequeue:
+				msg.Nack(false, true)
+				fmt.Println("Message unsuccessful and requeued")
+			case NackDiscard:
+				msg.Nack(false, false)
+				fmt.Println("Message unsuccessful and discarded")
 			}
 		}
 	}()
-
 	return nil
 }
