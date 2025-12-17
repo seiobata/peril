@@ -52,10 +52,23 @@ func main() {
 		routing.ArmyMovesPrefix+"."+username,
 		routing.ArmyMovesPrefix+".*",
 		pubsub.Transient,
-		handlerArmyMove(gs),
+		handlerArmyMove(gs, ch),
 	)
 	if err != nil {
 		log.Fatalf("could not create army move subscribe channel: %v", err)
+	}
+
+	// create subscription for war queue
+	err = pubsub.SubscribeJSON(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.WarRecognitionsPrefix, // all clients share the same queue
+		routing.WarRecognitionsPrefix+".*",
+		pubsub.Durable,
+		handlerMakeWar(gs),
+	)
+	if err != nil {
+		log.Fatalf("could not create war subscribe channel: %v", err)
 	}
 
 	// start REPL; listen for player commands
