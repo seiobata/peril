@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/seiobata/peril/internal/gamelogic"
 	"github.com/seiobata/peril/internal/pubsub"
@@ -65,7 +66,7 @@ func main() {
 		routing.WarRecognitionsPrefix, // all clients share the same queue
 		routing.WarRecognitionsPrefix+".*",
 		pubsub.Durable,
-		handlerMakeWar(gs),
+		handlerMakeWar(gs, ch),
 	)
 	if err != nil {
 		log.Fatalf("could not create war subscribe channel: %v", err)
@@ -120,4 +121,17 @@ func main() {
 			fmt.Printf("Unknown command. Enter \"help\" for list of commands.\n")
 		}
 	}
+}
+
+func publishGameLog(ch *amqp.Channel, msg, username string) error {
+	return pubsub.PublishGob(
+		ch,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug+"."+username,
+		routing.GameLog{
+			CurrentTime: time.Now(),
+			Message:     msg,
+			Username:    username,
+		},
+	)
 }
