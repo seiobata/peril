@@ -1,6 +1,8 @@
 package pubsub
 
 import (
+	"bytes"
+	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -70,26 +72,64 @@ func SubscribeJSON[T any](
 	queueType SimpleQueueType,
 	handler func(T) AckType,
 ) error {
+	return subscribe(
+		conn,
+		exchange,
+		queueName,
+		key,
+		queueType,
+		handler,
+		jsonUnmarshal[T],
+	)
+}
+
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T) AckType,
+) error {
+	return subscribe(
+		conn,
+		exchange,
+		queueName,
+		key,
+		queueType,
+		handler,
+		gobUnmarshal[T],
+	)
+}
+
+func subscribe[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T) AckType,
+	unmarshaller func([]byte) (T, error),
+) error {
 	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
 		return fmt.Errorf("could not declare and bind queue: %v", err)
 	}
 
-	deliveryCh, err := ch.Consume(queue.Name, "", false, false, false, false, nil)
+	msgs, err := ch.Consume(queue.Name, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("problem creating consume channel: %v", err)
 	}
 
 	go func() {
 		defer ch.Close()
-		for msg := range deliveryCh {
-			var body T
-			if err := json.Unmarshal(msg.Body, &body); err != nil {
+		for msg := range msgs {
+			body, err := unmarshaller(msg.Body)
+			if err != nil {
 				log.Printf("could not unmarshal message body: %v", err)
 				continue
 			}
-			acknowledged := handler(body)
-			switch acknowledged {
+			switch handler(body) {
 			case Ack:
 				msg.Ack(false)
 				fmt.Println("Message successfully acknowledged!")
@@ -103,4 +143,24 @@ func SubscribeJSON[T any](
 		}
 	}()
 	return nil
+}
+
+func jsonUnmarshal[T any](dat []byte) (T, error) {
+	var body T
+	if err := json.Unmarshal(dat, &body); err != nil {
+		fmt.Printf("problem unmarshaling JSON: %v", err)
+		return body, err
+	}
+	return body, nil
+}
+
+func gobUnmarshal[T any](dat []byte) (T, error) {
+	buf := bytes.NewBuffer(dat)
+	dec := gob.NewDecoder(buf)
+	var body T
+	if err := dec.Decode(&body); err != nil {
+		fmt.Printf("problem unmarshaling Gob: %v", err)
+		return body, err
+	}
+	return body, nil
 }

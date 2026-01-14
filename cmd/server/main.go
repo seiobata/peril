@@ -22,17 +22,23 @@ func main() {
 	defer conn.Close()
 	fmt.Println("Peril server connected to RabbitMQ!")
 
-	pubChan, queue, err := pubsub.DeclareAndBind(
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("problem opening channel: %v", err)
+	}
+
+	// create subscription for game_logs queue
+	err = pubsub.SubscribeGob(
 		conn,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		routing.GameLogSlug+".*",
 		pubsub.Durable,
+		handlerGameLog(),
 	)
 	if err != nil {
-		log.Fatalf("problem declaring and binding queue: %v", err)
+		log.Fatalf("could not create game_logs subscription: %v", err)
 	}
-	fmt.Printf("%v queue declared and bound!\n", queue.Name)
 
 	gamelogic.PrintServerHelp()
 	for {
@@ -43,7 +49,7 @@ func main() {
 		switch words[0] {
 		case "pause":
 			err = pubsub.PublishJSON(
-				pubChan,
+				ch,
 				routing.ExchangePerilDirect,
 				routing.PauseKey,
 				routing.PlayingState{
@@ -53,10 +59,10 @@ func main() {
 			if err != nil {
 				log.Printf("problem publishing message: %v", err)
 			}
-			fmt.Printf("Published pause to %v queue\n", queue.Name)
+			fmt.Println("Game has been paused!")
 		case "resume":
 			err = pubsub.PublishJSON(
-				pubChan,
+				ch,
 				routing.ExchangePerilDirect,
 				routing.PauseKey,
 				routing.PlayingState{
@@ -66,7 +72,7 @@ func main() {
 			if err != nil {
 				log.Printf("problem publishing message: %v", err)
 			}
-			fmt.Printf("Published resume to %v queue\n", queue.Name)
+			fmt.Println("Game has been resumed!")
 		case "quit":
 			fmt.Println("Peril server shutting down...")
 			return
