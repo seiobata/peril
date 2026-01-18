@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/seiobata/peril/internal/gamelogic"
@@ -111,7 +112,23 @@ func main() {
 			gamelogic.PrintClientHelp()
 
 		case "spam":
-			fmt.Println("Spamming is not allowed yet!")
+			if len(words) != 2 {
+				fmt.Printf("invalid format for \"spam\" command.\n")
+				continue
+			}
+			count, err := strconv.Atoi(words[1])
+			if err != nil {
+				fmt.Printf("problem executing \"spam\" command: %v\n", err)
+				continue
+			}
+			for i := 0; i < count; i++ {
+				log := gamelogic.GetMaliciousLog()
+				if err = publishGameLog(ch, log, username); err != nil {
+					fmt.Printf("problem publishing game_log: %v\n", err)
+					break
+				}
+			}
+			fmt.Printf("publishing %v malicious logs\n", count)
 
 		case "quit":
 			gamelogic.PrintQuit()
