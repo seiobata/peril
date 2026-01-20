@@ -116,6 +116,10 @@ func subscribe[T any](
 		return fmt.Errorf("could not declare and bind queue: %v", err)
 	}
 
+	if err = ch.Qos(10, 0, false); err != nil {
+		return fmt.Errorf("could not apply prefetch count: %v", err)
+	}
+
 	msgs, err := ch.Consume(queue.Name, "", false, false, false, false, nil)
 	if err != nil {
 		return fmt.Errorf("problem creating consume channel: %v", err)
